@@ -18,15 +18,17 @@ import pdb
 parser = argparse.ArgumentParser(description='McMRSR')
 
 # model name
-parser.add_argument('--experiment_name', type=str, default='your save model name', help='give a experiment name before training')
+parser.add_argument('--experiment_name', type=str, default='test_fixefft', help='give a experiment name before training')
 parser.add_argument('--model_type', type=str, default='McMRSR', help='model type')
 parser.add_argument('--resume', type=str, default=None, help='Filename of the checkpoint to resume')
 
 # dataset
-parser.add_argument('--data_root', type=str, default='your data', help='data root folder')
-parser.add_argument('--list_dir', type=str, default='your data list', help='data list_dir root folder')
+parser.add_argument('--data_root', type=str, default='/data/SZTU200H5', help='data root folder')
+parser.add_argument('--list_dir', type=str, default='data_list_M4Raw', help='data list_dir root folder')
 parser.add_argument('--mask_path', type=str, default='data_demo/dc_mask/lr_4x', help='data list_dir root folder')
-parser.add_argument('--dataset', type=str, default='Clinical', help='dataset name')
+parser.add_argument('--dataset', type=str, default='M4Raw', help='dataset name')
+parser.add_argument('--input_contrast', type=str, default='FLAIR', help='input contrast type, e.g. T1, T2, FLAIR')
+parser.add_argument('--ref_contrast', type=str, default='T1', help='ref contrast type, e.g. T1, T2, FLAIR')
 
 # model architectures
 parser.add_argument('--net_G', type=str, default='McMRSR', help='generator network')
@@ -44,11 +46,11 @@ parser.add_argument('--wr_L1', type=float, default=1, help='weight for reconstru
 
 # training options
 parser.add_argument('--n_epochs', type=int, default=200, help='number of epoch')
-parser.add_argument('--batch_size', type=int, default=2, help='training batch size')
+parser.add_argument('--batch_size', type=int, default=1, help='training batch size')
 
 # evaluation options
-parser.add_argument('--eval_epochs', type=int, default=4, help='evaluation epochs')
-parser.add_argument('--save_epochs', type=int, default=4, help='save evaluation for every number of epochs')
+parser.add_argument('--eval_epochs', type=int, default=10, help='evaluation epochs')
+parser.add_argument('--save_epochs', type=int, default=50, help='save evaluation for every number of epochs')
 
 parser.add_argument('--center_fractions', type=float, default=1.0/8.0, help='Cartesian: cernter fraction')
 parser.add_argument('--accelerations', type=float, default=5.0, help='Cartesian: acceleration rate')
@@ -79,8 +81,8 @@ parser.add_argument('--output_path', default='./', type=str, help='Output path.'
 
 # other
 parser.add_argument('--num_workers', type=int, default=8, help='number of threads to load data')
-# parser.add_argument('--gpu_ids', type=int, nargs='+', default=[0], help='list of gpu ids')
-parser.add_argument('--gpu_ids', type=int, default=[0,1], help='list of gpu ids')
+parser.add_argument('--gpu_ids', type=int, nargs='+', default=[0], help='list of gpu ids')
+# parser.add_argument('--gpu_ids', type=int, default=[0,1], help='list of gpu ids')
 opts = parser.parse_args()
 
 options_str = json.dumps(opts.__dict__, indent=4, sort_keys=False)
@@ -152,19 +154,22 @@ for epoch in range(ep0, opts.n_epochs + 1):
         model.save(checkpoint_name, epoch, total_iter)
 
     # evaluation
-    print('Validation Evaluation ......')
     if (epoch+1) % opts.eval_epochs == 0:
+        print('Validation Evaluation ......')
         pred = os.path.join(image_directory, 'pred_{:03d}.png'.format(epoch))
         gt = os.path.join(image_directory, 'gt_{:03d}.png'.format(epoch))
         input_sub = os.path.join(image_directory, 'input_{:03d}.png'.format(epoch))
 
         if opts.wr_L1 > 0:
             print(model.recon.detach().shape)
-            vis_pred = (model.recon.detach()[:, 0:1, :, :] ** 2 + model.recon.detach()[:, 1:2, :, :] ** 2).sqrt()
+            recon = model.recon.detach()*2-1
+            vis_pred = (torch.abs(recon[:, 0:1, :, :]) ** 2 + torch.abs(recon[:, 1:2, :, :]) ** 2).sqrt()
             save_image(vis_pred, pred, normalize=True, scale_each=True, padding=5)
-            vis_gt = (model.tag_image_full.detach()[:, 0:1, :, :] ** 2 + model.tag_image_full.detach()[:, 1:2, :, :] ** 2).sqrt()
+            tag_image_full = model.tag_image_full.detach()*2-1
+            vis_gt = (torch.abs(tag_image_full[:, 0:1, :, :]) ** 2 + torch.abs(tag_image_full[:, 1:2, :, :]) ** 2).sqrt()
             save_image(vis_gt, gt, normalize=True, scale_each=True, padding=5)
-            vis_input = (model.tag_image_sub.detach()[:, 0:1, :, :] ** 2 + model.tag_image_sub.detach()[:, 1:2, :, :] ** 2).sqrt()
+            tag_image_sub = model.tag_image_sub.detach()*2-1
+            vis_input = (torch.abs(tag_image_sub[:, 0:1, :, :]) ** 2 + torch.abs(tag_image_sub[:, 1:2, :, :]) ** 2).sqrt()
             save_image(vis_input, input_sub, normalize=True, scale_each=True, padding=5)
 
         model.eval()
