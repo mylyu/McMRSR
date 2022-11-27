@@ -8,6 +8,7 @@ import numpy as np
 import torch.backends.cudnn as cudnn
 
 from torchvision.utils import save_image
+import torchvision.transforms as T
 from utils import prepare_sub_folder
 from datasets import get_datasets
 from models import create_model
@@ -30,6 +31,7 @@ parser.add_argument('--dataset', type=str, default='M4Raw', help='dataset name')
 parser.add_argument('--input_contrast', type=str, default='FLAIR', help='input contrast type, e.g. T1, T2, FLAIR')
 parser.add_argument('--ref_contrast', type=str, default='T1', help='ref contrast type, e.g. T1, T2, FLAIR')
 parser.add_argument('--online_reg', type=str, default= None, help='online reg using ANTS')
+parser.add_argument('--multinex', default=False, action='store_true', help='whether to use multiplex NEXs')
 
 # model architectures
 parser.add_argument('--net_G', type=str, default='McMRSR', help='generator network')
@@ -130,6 +132,11 @@ with open(os.path.join(output_directory, 'train_loss.csv'), 'w') as f:
     writer = csv.writer(f)
     writer.writerow(model.loss_names)
 
+if opts.resume is not None:
+    print('Direct Evaluation after Resume......')
+    model.eval()
+    with torch.no_grad():
+        model.evaluate(val_loader)
 # training loop
 for epoch in range(ep0, opts.n_epochs + 1):
 
@@ -171,6 +178,8 @@ for epoch in range(ep0, opts.n_epochs + 1):
             save_image(vis_gt, gt, normalize=True, scale_each=True, padding=5)
             tag_image_sub = model.tag_image_sub.detach()*2-1
             vis_input = (torch.abs(tag_image_sub[:, 0:1, :, :]) ** 2 + torch.abs(tag_image_sub[:, 1:2, :, :]) ** 2).sqrt()
+            transform = T.Resize(size = (256,256))
+            vis_input = transform(vis_input)
             save_image(vis_input, input_sub, normalize=True, scale_each=True, padding=5)
 
         model.eval()
