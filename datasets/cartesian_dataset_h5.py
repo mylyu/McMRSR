@@ -58,6 +58,9 @@ class MRIDataset_Cartesian(data.Dataset):
         self.upscale = opts.upscale
         self.input_contrast = opts.input_contrast
         self.ref_contrast = opts.ref_contrast
+        self.online_reg = opts.online_reg
+        if self.online_reg is not None:
+            print('online registration.... maybe slow')
     def __getitem__(self, idx):
 
         mask = sio.loadmat(self.mask_path)['lr_mask']
@@ -73,27 +76,48 @@ class MRIDataset_Cartesian(data.Dataset):
         else:
             iSlice = 9
         # iCoil = 1
-        with h5py.File(T2_file) as hf:
-            nSlice = hf["kspace"].shape[0]
-            nCoil = hf["kspace"].shape[1]
-            # iSlice = np.random.randint(0, nSlice)
-            ksp = hf["kspace"][iSlice, :, :, :]/100
-            # img_mc = mrfft.ifft2c(ksp)
-            T2 = mrfft.sos(mrfft.ifft2c(ksp), 0) * np.exp(1j*np.pi*0.25)
-            # T2 = mrfft.ifft2c(ksp)
-            ksp_64 = crop(ksp, (nCoil, 256//self.upscale, 256//self.upscale))
-            T2_64 = mrfft.sos(mrfft.ifft2c(ksp_64)/self.upscale, 0)* np.exp(1j*np.pi*0.25)
-            # print(T2_64.shape)
-            # T2_64 = mrfft.ifft2c(ksp_64)/self.upscale
-        with h5py.File(T1_file) as hf:
-            nSlice = hf["kspace"].shape[1]
-            # iSlice = np.random.randint(0, nSlice)
-            ksp = hf["kspace"][iSlice, :, :, :]/100 
-            T1 = mrfft.sos(mrfft.ifft2c(ksp), 0) * np.exp(1j*np.pi*0.25)
-            # T1 = mrfft.ifft2c(ksp) 
-            ksp_64 = crop(ksp, (nCoil, 256//self.upscale, 256//self.upscale))
-            T1_64 = mrfft.sos(mrfft.ifft2c(ksp_64)/self.upscale, 0) * np.exp(1j*np.pi*0.25)
-            # T1_64 = mrfft.ifft2c(ksp_64)/self.upscale
+        try:
+            with h5py.File(T2_file) as hf:
+                nSlice = hf["kspace"].shape[0]
+                nCoil = hf["kspace"].shape[1]
+                # iSlice = np.random.randint(0, nSlice)
+                ksp = hf["kspace"][iSlice, :, :, :]/100
+                # img_mc = mrfft.ifft2c(ksp)
+                T2 = mrfft.sos(mrfft.ifft2c(ksp), 0) * np.exp(1j*np.pi*0.25)
+                # T2 = mrfft.ifft2c(ksp)
+                ksp_64 = crop(ksp, (nCoil, 256//self.upscale, 256//self.upscale))
+                T2_64 = mrfft.sos(mrfft.ifft2c(ksp_64)/self.upscale, 0)* np.exp(1j*np.pi*0.25)
+                # print(T2_64.shape)
+                # T2_64 = mrfft.ifft2c(ksp_64)/self.upscale
+            with h5py.File(T1_file) as hf:
+                nSlice = hf["kspace"].shape[1]
+                # iSlice = np.random.randint(0, nSlice)
+                ksp = hf["kspace"][iSlice, :, :, :]/100
+                ref_img = mrfft.sos(mrfft.ifft2c(ksp), 0)
+                if self.online_reg is not None:
+                    import ants
+                    fixed = ants.from_numpy(np.abs(T2))
+                    moving = ants.from_numpy(np.abs(ref_img))
+                    mytx = ants.registration(fixed=fixed , moving=moving ,
+                                                 type_of_transform = 'Rigid' )
+                    ref_img = ants.apply_transforms( fixed=fixed, 
+                                                          moving=moving,
+                                                        transformlist=mytx['fwdtransforms']).numpy()
+
+
+
+                T1 = ref_img * np.exp(1j*np.pi*0.25)
+                # T1 = mrfft.ifft2c(ksp) 
+                ksp_64 = crop(mrfft.fft2c(T1), (256//self.upscale, 256//self.upscale))
+                T1_64 = np.abs(mrfft.ifft2c(ksp_64)/self.upscale) * np.exp(1j*np.pi*0.25)
+                # T1_64 = mrfft.ifft2c(ksp_64)/self.upscale
+        except Exception as e:
+            print(e)
+            print("ERROR at {}, {}, slice {}".format(T2_file, T1_file,iSlice))
+            T2 = np.ones((256,256),dtype=complex)
+            T2_64 = 0.95*np.ones((256//self.upscale,256//self.upscale),dtype=complex)
+            T1 = 0.99*np.ones((256//self.upscale,256//self.upscale),dtype=complex)
+            T1_64 = 0.98*np.ones((256//self.upscale,256//self.upscale),dtype=complex)
         #=======
         T2_256_img_real = T2.real  # ZF
         T2_256_img_real = T2_256_img_real[np.newaxis, :, :]

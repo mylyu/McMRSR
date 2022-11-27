@@ -29,6 +29,7 @@ parser.add_argument('--mask_path', type=str, default='data_demo/dc_mask/lr_4x', 
 parser.add_argument('--dataset', type=str, default='M4Raw', help='dataset name')
 parser.add_argument('--input_contrast', type=str, default='FLAIR', help='input contrast type, e.g. T1, T2, FLAIR')
 parser.add_argument('--ref_contrast', type=str, default='T1', help='ref contrast type, e.g. T1, T2, FLAIR')
+parser.add_argument('--online_reg', type=str, default= None, help='online reg using ANTS')
 
 # model architectures
 parser.add_argument('--net_G', type=str, default='McMRSR', help='generator network')

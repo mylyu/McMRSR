@@ -116,11 +116,11 @@ class RecurrentModel(nn.Module):
 
         loss_img_l1 = 0
         for j in range(1, self.n_recurrent + 1):
-            loss_img_l1 = loss_img_l1 + self.criterion(self.net['r%d_img_pred' % j], self.tag_image_full)
+            loss_img_l1 = loss_img_l1 + self.criterion(self.net['r%d_img_pred' % j], self.tag_image_full)*self.opts.wr_L1
         loss_kspc = 0
         for j in range(1, self.n_recurrent + 1):
             # print(self.tag_kspace_full.dtype, self.net['r%d_kspc_img_dc' % j].dtype)
-            loss_kspc = loss_kspc + self.mse(self.net['r%d_kspc_img_dc' % j],self.tag_kspace_full) * 10
+            loss_kspc = loss_kspc + self.mse(self.net['r%d_kspc_img_dc' % j],self.tag_kspace_full) * 100
 
         loss_G_L1 = loss_img_l1 + loss_kspc
         self.loss_G_L1 = loss_G_L1.item()
