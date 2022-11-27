@@ -114,10 +114,12 @@ class MRIDataset_Cartesian(data.Dataset):
         except Exception as e:
             print(e)
             print("ERROR at {}, {}, slice {}".format(T2_file, T1_file,iSlice))
-            T2 = np.ones((256,256),dtype=complex)
-            T2_64 = 0.95*np.ones((256//self.upscale,256//self.upscale),dtype=complex)
-            T1 = 0.99*np.ones((256//self.upscale,256//self.upscale),dtype=complex)
-            T1_64 = 0.98*np.ones((256//self.upscale,256//self.upscale),dtype=complex)
+            shape = (256,256)
+            shape_small = (256//self.upscale, 256//self.upscale)
+            T2 = np.random.uniform(-1, 1, shape) + 1.j * np.random.uniform(-1, 1, shape)
+            T2_64 = np.random.uniform(-1, 1, shape_small) + 1.j * np.random.uniform(-1, 1, shape_small)
+            T1 = np.random.uniform(-1, 1, shape) + 1.j * np.random.uniform(-1, 1, shape)
+            T1_64 = np.random.uniform(-1, 1, shape_small) + 1.j * np.random.uniform(-1, 1, shape_small)
         #=======
         T2_256_img_real = T2.real  # ZF
         T2_256_img_real = T2_256_img_real[np.newaxis, :, :]
