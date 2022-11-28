@@ -32,6 +32,7 @@ parser.add_argument('--input_contrast', type=str, default='FLAIR', help='input c
 parser.add_argument('--ref_contrast', type=str, default='T1', help='ref contrast type, e.g. T1, T2, FLAIR')
 parser.add_argument('--online_reg', type=str, default= None, help='online reg using ANTS')
 parser.add_argument('--multinex', default=False, action='store_true', help='whether to use multiplex NEXs')
+parser.add_argument('--sr_factor', type=int, default=4, help='super-resolution factor')
 
 # model architectures
 parser.add_argument('--net_G', type=str, default='McMRSR', help='generator network')

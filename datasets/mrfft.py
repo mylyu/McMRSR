@@ -45,6 +45,13 @@ def sos(x, axis=- 1):
     res = np.sqrt(np.mean(np.abs(x)**2, axis=axis))
     return res
 
+def rsos(x, axis=0):
+    '''
+    root mean sum of squares, by default on first axis
+    '''
+    res = np.sqrt(np.mean(np.abs(x)**2, axis=axis))
+    return res
+
 def zpad(array_in, outshape):
     import math
     #out = np.zeros(outshape, dtype=array_in.dtype)

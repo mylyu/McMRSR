@@ -56,7 +56,7 @@ class MRIDataset_Cartesian(data.Dataset):
 
         self.data_dir_flair = os.path.join(self.data_dir_flair)    # ref kspace directory (input)
         self.mask_path = opts.mask_path
-        self.upscale = opts.upscale
+        self.sr_factor = opts.sr_factor
         self.input_contrast = opts.input_contrast
         self.ref_contrast = opts.ref_contrast
         self.online_reg = opts.online_reg
@@ -84,31 +84,37 @@ class MRIDataset_Cartesian(data.Dataset):
         ref_file_list = glob.glob(os.path.join(self.data_dir_flair, "{}_{}0*.h5".format(study_name,self.ref_contrast)))
         if not self.multinex:
             # just use one nex
-            input_file_list = input_file_list[:1]
-            ref_file_list = ref_file_list[:1]
+            input_file_list = [os.path.join(self.data_dir_flair, "{}_{}01.h5".format(study_name,self.input_contrast))]
+            ref_file_list = [os.path.join(self.data_dir_flair, "{}_{}01.h5".format(study_name,self.ref_contrast))]
         
         scale_factor = 100
         nSlice, nCoil, nFe, nPe = 18, 4, 256, 256
         try:
             input_img = np.zeros(shape=(nFe, nPe),dtype=complex)
+            input_lowres = np.zeros(shape=(nFe//self.sr_factor, nPe//self.sr_factor),dtype=complex)
             for i_file, input_file in enumerate(input_file_list):
                 with h5py.File(input_file) as hf:
                     # nSlice, nCoil, nFe, nPe = hf["kspace"].shape
                     ksp = hf["kspace"][iSlice, :, :, :]/scale_factor
-                    input_img_this = mrfft.sos(mrfft.ifft2c(ksp), 0)
+                    input_img_this = mrfft.rsos(mrfft.ifft2c(ksp))
                     # take the average, let us assume there are not motion between input NEXs
                     input_img = (input_img*i_file + input_img_this)/(i_file+1)
+                    ksp_lowres_this = crop(ksp, (nCoil, nFe//self.sr_factor, nPe//self.sr_factor))
+                    input_lowres_this = mrfft.rsos(mrfft.ifft2c(ksp_lowres_this)/self.sr_factor)
+                    input_lowres = (input_lowres*i_file + input_lowres_this)/(i_file+1)
+                    
             input_img = input_img * np.exp(1j*np.pi*0.25) # simulate phase here for now
+            input_lowres = input_lowres * np.exp(1j*np.pi*0.25)
             # print(input_img.shape)
-            ksp_lowres = crop(mrfft.fft2c(input_img), (nFe//self.upscale, nPe//self.upscale))
-            input_lowres = mrfft.ifft2c(ksp_lowres)/self.upscale
+            # ksp_lowres = crop(mrfft.fft2c(input_img), (nFe//self.sr_factor, nPe//self.sr_factor))
+            # input_lowres = mrfft.ifft2c(ksp_lowres)/self.sr_factor
 
             ref_img = np.zeros(shape=(nFe, nPe),dtype=complex)
             for i_file, ref_file in enumerate(ref_file_list):
                 with h5py.File(ref_file) as hf:
                     # nSlice, nCoil, _, _ = hf["kspace"].shape
                     ksp = hf["kspace"][iSlice, :, :, :]/scale_factor
-                    ref_img_this = mrfft.sos(mrfft.ifft2c(ksp), 0)
+                    ref_img_this = mrfft.rsos(mrfft.ifft2c(ksp))
                     ref_img = (ref_img*i_file + ref_img_this)/(i_file+1)
 
             if self.online_reg is not None:
@@ -116,8 +122,12 @@ class MRIDataset_Cartesian(data.Dataset):
                 # uses low-res ref and low-res input to get register info
                 fixed = ants.from_numpy(np.abs(input_lowres))
                 fixed = ants.resample_image(fixed,(nPe, nFe), 1, 0)
-                temp_ksp_lowres = crop(mrfft.fft2c(ref_img), (nFe//self.upscale, nPe//self.upscale))
-                temp_ref_lowres = mrfft.ifft2c(temp_ksp_lowres)/self.upscale
+                
+                # fixed = ants.from_numpy(np.abs(input_img)) ## not realistic
+                # moving = ants.from_numpy(np.abs(ref_img))
+                
+                temp_ksp_lowres = crop(mrfft.fft2c(ref_img), (nFe//self.sr_factor, nPe//self.sr_factor))
+                temp_ref_lowres = mrfft.ifft2c(temp_ksp_lowres)/self.sr_factor
                 moving = ants.from_numpy(np.abs(temp_ref_lowres))
                 moving = ants.resample_image(moving, (nPe, nFe), 1, 0)
                 mytx = ants.registration(fixed=fixed, moving=moving,
@@ -126,15 +136,15 @@ class MRIDataset_Cartesian(data.Dataset):
                                                 moving=ants.from_numpy(np.abs(ref_img)),
                                                 transformlist=mytx['fwdtransforms']).numpy()
             ref_img = ref_img * np.exp(1j*np.pi*0.25) # simulate phase here for now        
-            ref_ksp_lowres = crop(mrfft.fft2c(ref_img), (nFe//self.upscale, nPe//self.upscale))
-            ref_lowres = mrfft.ifft2c(ref_ksp_lowres)/self.upscale
+            ref_ksp_lowres = crop(mrfft.fft2c(ref_img), (nFe//self.sr_factor, nPe//self.sr_factor))
+            ref_lowres = mrfft.ifft2c(ref_ksp_lowres)/self.sr_factor
                 
         except Exception as e:
             print(e)
             raise e
             print("ERROR at {}, {}, slice {}".format(ref_file, input_file,iSlice))
             shape = (256,256)
-            shape_small = (256//self.upscale, 256//self.upscale)
+            shape_small = (256//self.sr_factor, 256//self.sr_factor)
             ref_img = np.random.uniform(-1, 1, shape) + 1.j * np.random.uniform(-1, 1, shape)
             ref_lowres = np.random.uniform(-1, 1, shape_small) + 1.j * np.random.uniform(-1, 1, shape_small)
             input_img = np.random.uniform(-1, 1, shape) + 1.j * np.random.uniform(-1, 1, shape)
