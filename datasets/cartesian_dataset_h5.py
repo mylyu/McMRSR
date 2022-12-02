@@ -108,36 +108,40 @@ class MRIDataset_Cartesian(data.Dataset):
             # print(input_img.shape)
             # ksp_lowres = crop(mrfft.fft2c(input_img), (nFe//self.sr_factor, nPe//self.sr_factor))
             # input_lowres = mrfft.ifft2c(ksp_lowres)/self.sr_factor
+            
+            if self.ref_contrast=="self_lowres":
+                ref_lowres = input_lowres
+                ref_img =  mrfft.ifft2c(mrfft.zpad(mrfft.fft2c(ref_lowres)*self.sr_factor, (nFe, nPe)))
+            else:
+                ref_img = np.zeros(shape=(nFe, nPe),dtype=complex)
+                for i_file, ref_file in enumerate(ref_file_list):
+                    with h5py.File(ref_file) as hf:
+                        # nSlice, nCoil, _, _ = hf["kspace"].shape
+                        ksp = hf["kspace"][iSlice, :, :, :]/scale_factor
+                        ref_img_this = mrfft.rsos(mrfft.ifft2c(ksp))
+                        ref_img = (ref_img*i_file + ref_img_this)/(i_file+1)
 
-            ref_img = np.zeros(shape=(nFe, nPe),dtype=complex)
-            for i_file, ref_file in enumerate(ref_file_list):
-                with h5py.File(ref_file) as hf:
-                    # nSlice, nCoil, _, _ = hf["kspace"].shape
-                    ksp = hf["kspace"][iSlice, :, :, :]/scale_factor
-                    ref_img_this = mrfft.rsos(mrfft.ifft2c(ksp))
-                    ref_img = (ref_img*i_file + ref_img_this)/(i_file+1)
+                if self.online_reg is not None:
+                    import ants
+                    # uses low-res ref and low-res input to get register info
+                    fixed = ants.from_numpy(np.abs(input_lowres))
+                    fixed = ants.resample_image(fixed,(nPe, nFe), 1, 0)
 
-            if self.online_reg is not None:
-                import ants
-                # uses low-res ref and low-res input to get register info
-                fixed = ants.from_numpy(np.abs(input_lowres))
-                fixed = ants.resample_image(fixed,(nPe, nFe), 1, 0)
-                
-                # fixed = ants.from_numpy(np.abs(input_img)) ## not realistic
-                # moving = ants.from_numpy(np.abs(ref_img))
-                
-                temp_ksp_lowres = crop(mrfft.fft2c(ref_img), (nFe//self.sr_factor, nPe//self.sr_factor))
-                temp_ref_lowres = mrfft.ifft2c(temp_ksp_lowres)/self.sr_factor
-                moving = ants.from_numpy(np.abs(temp_ref_lowres))
-                moving = ants.resample_image(moving, (nPe, nFe), 1, 0)
-                mytx = ants.registration(fixed=fixed, moving=moving,
-                                         type_of_transform = 'Rigid')
-                ref_img = ants.apply_transforms(fixed=fixed, 
-                                                moving=ants.from_numpy(np.abs(ref_img)),
-                                                transformlist=mytx['fwdtransforms']).numpy()
-            ref_img = ref_img * np.exp(1j*np.pi*0.25) # simulate phase here for now        
-            ref_ksp_lowres = crop(mrfft.fft2c(ref_img), (nFe//self.sr_factor, nPe//self.sr_factor))
-            ref_lowres = mrfft.ifft2c(ref_ksp_lowres)/self.sr_factor
+                    # fixed = ants.from_numpy(np.abs(input_img)) ## not realistic
+                    # moving = ants.from_numpy(np.abs(ref_img))
+
+                    temp_ksp_lowres = crop(mrfft.fft2c(ref_img), (nFe//self.sr_factor, nPe//self.sr_factor))
+                    temp_ref_lowres = mrfft.ifft2c(temp_ksp_lowres)/self.sr_factor
+                    moving = ants.from_numpy(np.abs(temp_ref_lowres))
+                    moving = ants.resample_image(moving, (nPe, nFe), 1, 0)
+                    mytx = ants.registration(fixed=fixed, moving=moving,
+                                             type_of_transform = 'Rigid')
+                    ref_img = ants.apply_transforms(fixed=fixed, 
+                                                    moving=ants.from_numpy(np.abs(ref_img)),
+                                                    transformlist=mytx['fwdtransforms']).numpy()
+                ref_img = ref_img * np.exp(1j*np.pi*0.25) # simulate phase here for now        
+                ref_ksp_lowres = crop(mrfft.fft2c(ref_img), (nFe//self.sr_factor, nPe//self.sr_factor))
+                ref_lowres = mrfft.ifft2c(ref_ksp_lowres)/self.sr_factor
                 
         except Exception as e:
             print(e)

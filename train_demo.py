@@ -165,6 +165,10 @@ for epoch in range(ep0, opts.n_epochs + 1):
     # evaluation
     if (epoch+1) % opts.eval_epochs == 0:
         print('Validation Evaluation ......')
+        model.eval()
+        with torch.no_grad():
+            model.evaluate(val_loader)
+        
         pred = os.path.join(image_directory, 'pred_{:03d}.png'.format(epoch))
         gt = os.path.join(image_directory, 'gt_{:03d}.png'.format(epoch))
         input_sub = os.path.join(image_directory, 'input_{:03d}.png'.format(epoch))
@@ -183,9 +187,7 @@ for epoch in range(ep0, opts.n_epochs + 1):
             vis_input = transform(vis_input)
             save_image(vis_input, input_sub, normalize=True, scale_each=True, padding=5)
 
-        model.eval()
-        with torch.no_grad():
-            model.evaluate(val_loader)
+        
 
         with open(os.path.join(output_directory, 'metrics.csv'), 'a') as f:
             writer = csv.writer(f)
