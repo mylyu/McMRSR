@@ -76,9 +76,9 @@ class MRIDataset_Cartesian(data.Dataset):
         study_name = self.sample_list[idx].strip('\n')
         # choose slices
         if self.mode == 'TRAIN':
-            iSlice = np.random.randint(5, 15)
+            iSlice = np.random.randint(0, 18)
         else:
-            iSlice = 9
+            iSlice = idx % 18
         
         input_file_list = glob.glob(os.path.join(self.data_dir_flair, "{}_{}0*.h5".format(study_name,self.input_contrast)))
         ref_file_list = glob.glob(os.path.join(self.data_dir_flair, "{}_{}0*.h5".format(study_name,self.ref_contrast)))
