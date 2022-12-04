@@ -75,8 +75,8 @@ parser.add_argument('--weight_decay', type=float, default=0, help='weight decay'
 
 # learning rate policy
 parser.add_argument('--lr_policy', type=str, default='step', help='learning rate decay policy')
-parser.add_argument('--step_size', type=int, default=1000, help='step size for step scheduler')
-parser.add_argument('--gamma', type=float, default=0.5, help='decay ratio for step scheduler')
+parser.add_argument('--step_size', type=int, default=400, help='step size for step scheduler')
+parser.add_argument('--gamma', type=float, default=0.2, help='decay ratio for step scheduler')
 
 # logger options
 parser.add_argument('--snapshot_epochs', type=int, default=10, help='save model for every number of epochs')

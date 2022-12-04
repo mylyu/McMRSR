@@ -76,9 +76,9 @@ class MRIDataset_Cartesian(data.Dataset):
         study_name = self.sample_list[idx].strip('\n')
         # choose slices
         if self.mode == 'TRAIN':
-            iSlice = np.random.randint(0, 18)
+            iSlice = np.random.randint(9-4, 9+5)
         else:
-            iSlice = idx % 18
+            iSlice = 9
         
         input_file_list = glob.glob(os.path.join(self.data_dir_flair, "{}_{}0*.h5".format(study_name,self.input_contrast)))
         ref_file_list = glob.glob(os.path.join(self.data_dir_flair, "{}_{}0*.h5".format(study_name,self.ref_contrast)))
@@ -145,8 +145,10 @@ class MRIDataset_Cartesian(data.Dataset):
                 
         except Exception as e:
             print(e)
-            raise e
-            print("ERROR at {}, {}, slice {}".format(ref_file, input_file,iSlice))
+            # raise e
+            print("ERROR at {}, slice {}".format(input_file, iSlice))
+            if 'ref_file' in locals():
+                print("ERROR at {}, slice {}".format(ref_file, iSlice))
             shape = (256,256)
             shape_small = (256//self.sr_factor, 256//self.sr_factor)
             ref_img = np.random.uniform(-1, 1, shape) + 1.j * np.random.uniform(-1, 1, shape)
